@@ -31,7 +31,7 @@ Always respond in a helpful, conversational tone while being technically accurat
     model: google("gemini-2.5-flash"),
     messages: await convertToModelMessages(messages),
     system: SYSTEM_PROMPT,
-    stopWhen: stepCountIs(5),
+    stopWhen: stepCountIs(5), // by default only one call
     tools: {
       schema: tool({
         description: "Call this tool to get database schema information.",
@@ -63,11 +63,12 @@ CREATE TABLE sales (
         inputSchema: z.object({
           query: z.string().describe("The sql query to be ran."),
         }),
-        execute: async ({ query }) => {
-         return await db.run(query);
-          // IMPORTANT :: MAKE SURE YOU SANITIZE IT...
-          console.log(query);
-          return query;
+        execute: async ({ query }: { query: string }) => {
+          const regex = /\b(?:INSERT|UPDATE|DELETE)\b/i;
+          const isFatal: boolean = regex.test(query);
+          if (isFatal)
+            return `this query is fatal and not permitted to agent to execute the query. Retry again for once.`;
+          return await db.run(query);
         },
       }),
     },
